@@ -1,0 +1,40 @@
+# Build klasörleri
+build/
+build-*/
+debug/
+release/
+
+# Qt Creator
+*.pro.user
+*.pro.user.*
+*.qbs.user
+*.qtc_clangd/
+
+# Derleme dosyaları
+*.o
+*.obj
+*.so
+*.a
+*.dll
+*.exe
+*.out
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+compile_commands.json
+
+# Qt moc/uic/rcc
+moc_*
+ui_*.h
+qrc_*.cpp
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

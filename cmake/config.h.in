@@ -1,0 +1,10 @@
+#ifndef OPENVIEW3D_CONFIG_H
+#define OPENVIEW3D_CONFIG_H
+
+#include <string>
+
+namespace openview3d {
+    const std::string resourcesPath = "@CMAKE_SOURCE_DIR@/resources";
+}
+
+#endif // OPENVIEW3D_CONFIG_H
