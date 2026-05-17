@@ -7,6 +7,7 @@
 #include <QQuickWindow>
 #include <QSurfaceFormat>
 #include <QtQml>
+#include <QIcon>
 
 int main(int argc, char* argv[])
 {
@@ -19,7 +20,9 @@ int main(int argc, char* argv[])
     QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
 
     QGuiApplication app(argc, argv);
-
+    app.setWindowIcon(
+        QIcon(":/qt/qml/OpenView3D/qml/icons/icon256.png")
+        );
     qmlRegisterType<OpenGLViewport>("OpenView3D", 1, 0, "OpenGLViewport");
 
     QQmlApplicationEngine engine;

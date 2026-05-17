@@ -1,0 +1,42 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="40" x2="432" y2="472" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F3FFF6"/>
+      <stop offset="1" stop-color="#DCECE6"/>
+    </linearGradient>
+    <linearGradient id="capsule" x1="140" y1="190" x2="360" y2="320" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#74C7FF"/>
+      <stop offset="0.55" stop-color="#3179D8"/>
+      <stop offset="1" stop-color="#1D4FA5"/>
+    </linearGradient>
+    <filter id="shadow" x="40" y="40" width="432" height="432" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#203040" flood-opacity="0.25"/>
+    </filter>
+  </defs>
+
+  <rect x="48" y="48" width="416" height="416" rx="94" fill="url(#bg)" filter="url(#shadow)"/>
+  <path d="M132 316C176 362 324 369 382 292" stroke="#B9D0CB" stroke-width="12" stroke-linecap="round" stroke-dasharray="42 28" opacity="0.8"/>
+  <path d="M126 290C167 226 309 187 384 220" stroke="#B9D0CB" stroke-width="10" stroke-linecap="round" stroke-dasharray="40 28" opacity="0.65"/>
+
+  <path d="M255 213V103" stroke="#36A76B" stroke-width="14" stroke-linecap="round"/>
+  <path d="M255 87L227 137H283L255 87Z" fill="#42BD78" stroke="#248B56" stroke-width="4"/>
+  <path d="M162 302L84 360" stroke="#1689F2" stroke-width="14" stroke-linecap="round"/>
+  <path d="M69 371L126 356L91 317L69 371Z" fill="#29A6FF" stroke="#1473C9" stroke-width="4"/>
+  <path d="M341 299L438 350" stroke="#F35B51" stroke-width="14" stroke-linecap="round"/>
+  <path d="M458 360L401 367L427 318L458 360Z" fill="#FF6A60" stroke="#D8433A" stroke-width="4"/>
+
+  <g transform="rotate(18 256 256)">
+    <rect x="132" y="188" width="248" height="120" rx="60" fill="url(#capsule)" stroke="#163E82" stroke-width="5"/>
+    <path d="M176 192C204 228 203 268 174 304" stroke="#CFEFFF" stroke-width="6" opacity="0.9"/>
+    <path d="M236 188C266 226 263 270 232 306" stroke="#CFEFFF" stroke-width="6" opacity="0.85"/>
+    <path d="M300 190C328 225 327 270 298 306" stroke="#CFEFFF" stroke-width="6" opacity="0.8"/>
+    <path d="M140 231H372" stroke="#CFEFFF" stroke-width="6" opacity="0.9"/>
+    <path d="M140 268H372" stroke="#CFEFFF" stroke-width="6" opacity="0.9"/>
+    <ellipse cx="185" cy="223" rx="32" ry="12" fill="white" opacity="0.35"/>
+    <circle cx="326" cy="211" r="10" fill="white" opacity="0.7"/>
+  </g>
+
+  <text x="256" y="422" text-anchor="middle"
+        font-family="Segoe UI, Arial, sans-serif"
+        font-size="54" font-weight="700" fill="#213246">OpenView3D</text>
+</svg>

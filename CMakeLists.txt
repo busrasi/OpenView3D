@@ -97,6 +97,8 @@ qt_add_qml_module(OpenView3D
         qml/icons/zoom.svg
         qml/icons/rotate.svg
         qml/icons/cursor.svg
+        qml/icons/openview3d-icon.svg
+        qml/icons/icon256.png
 )
 
 
