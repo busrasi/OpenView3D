@@ -11,7 +11,10 @@ ApplicationWindow {
     height: 760
     visible: true
     title: "OpenView3D"
+
     property var appController
+    property bool transformExpanded: false
+
     color: "#F7F8FA"
 
     FileDialog {
@@ -30,10 +33,13 @@ ApplicationWindow {
 
     component ToolButtonCard: Rectangle {
         id: card
+
         property string title: ""
         property string subtitle: ""
         property string iconSource: ""
+
         signal clicked()
+
         height: 42
         radius: 8
         color: mouseArea.containsMouse ? "#EEF2FF" : "#FFFFFF"
@@ -57,6 +63,7 @@ ApplicationWindow {
             ColumnLayout {
                 Layout.fillWidth: true
                 spacing: 0
+
                 Text {
                     text: card.title
                     color: "#202430"
@@ -65,6 +72,7 @@ ApplicationWindow {
                     elide: Text.ElideRight
                     Layout.fillWidth: true
                 }
+
                 Text {
                     visible: card.subtitle.length > 0
                     text: card.subtitle
@@ -87,15 +95,19 @@ ApplicationWindow {
 
     component LabeledSlider: ColumnLayout {
         id: sliderBlock
+
         property string label: ""
         property real valueNumber: 0
         property real fromValue: 0
         property real toValue: 100
+
         signal moved(real value)
+
         spacing: 6
 
         RowLayout {
             Layout.fillWidth: true
+
             Text {
                 text: sliderBlock.label
                 color: "#333846"
@@ -103,6 +115,7 @@ ApplicationWindow {
                 font.weight: Font.Medium
                 Layout.fillWidth: true
             }
+
             Text {
                 text: Math.round(sliderBlock.valueNumber * 100) / 100
                 color: "#667085"
@@ -118,7 +131,6 @@ ApplicationWindow {
             to: sliderBlock.toValue
             value: sliderBlock.valueNumber
             live: true
-            enabled: true
 
             onMoved: {
                 sliderBlock.valueNumber = value
@@ -194,7 +206,11 @@ ApplicationWindow {
                     font.weight: Font.DemiBold
                 }
 
-                Rectangle { width: 1; height: 20; color: "#E6E8EF" }
+                Rectangle {
+                    width: 1
+                    height: 20
+                    color: "#E6E8EF"
+                }
 
                 Text {
                     text: "Model Viewer / CAD Preview"
@@ -208,6 +224,7 @@ ApplicationWindow {
                     height: 26
                     width: 84
                     color: "#EEF2FF"
+
                     Text {
                         anchors.centerIn: parent
                         text: "Design"
@@ -250,6 +267,7 @@ ApplicationWindow {
                             radius: 8
                             color: index === 1 ? "#EEF2FF" : "transparent"
                             border.color: index === 1 ? "#5E7BFF" : "transparent"
+
                             Image {
                                 anchors.centerIn: parent
                                 source: modelData
@@ -311,47 +329,95 @@ ApplicationWindow {
                         onClicked: root.appController.resetCamera()
                     }
 
-                    Rectangle { Layout.fillWidth: true; height: 1; color: "#E6E8EF" }
-
-                    Text {
-                        text: "Transform"
-                        color: "#1D2433"
-                        font.pixelSize: 13
-                        font.weight: Font.DemiBold
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: 1
+                        color: "#E6E8EF"
                     }
 
-                    LabeledSlider {
+                    Rectangle {
                         Layout.fillWidth: true
-                        label: "Zoom"
-                        fromValue: 0.2
-                        toValue: 5.0
-                        valueNumber: root.appController ? root.appController.zoom : 1.0
-                        onMoved: function(value) {
-                            root.appController.zoom = value
+                        Layout.preferredHeight: 34
+                        radius: 8
+                        color: transformMouse.containsMouse ? "#EEF2FF" : "transparent"
+
+                        RowLayout {
+                            anchors.fill: parent
+                            anchors.leftMargin: 6
+                            anchors.rightMargin: 8
+
+                            Text {
+                                text: "Transform"
+                                color: "#1D2433"
+                                font.pixelSize: 13
+                                font.weight: Font.DemiBold
+                                Layout.fillWidth: true
+                            }
+
+                            Text {
+                                text: root.transformExpanded ? "⌃" : "⌄"
+                                color: "#5E7BFF"
+                                font.pixelSize: 16
+                                font.weight: Font.DemiBold
+                            }
+                        }
+
+                        MouseArea {
+                            id: transformMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.transformExpanded = !root.transformExpanded
                         }
                     }
 
-                    LabeledSlider {
+                    ColumnLayout {
                         Layout.fillWidth: true
-                        label: "X Rotation"
-                        fromValue: -180
-                        toValue: 180
-                        valueNumber: root.appController ? root.appController.rotationX : 0
-                        onMoved: root.appController.rotationX = value
-                    }
+                        spacing: 12
+                        visible: root.transformExpanded
 
-                    LabeledSlider {
-                        Layout.fillWidth: true
-                        label: "Y Rotation"
-                        fromValue: -180
-                        toValue: 180
-                        valueNumber: root.appController ? root.appController.rotationY : 0
-                        onMoved: function(value) {
-                            root.appController.rotationY = value
+                        LabeledSlider {
+                            Layout.fillWidth: true
+                            label: "Zoom"
+                            fromValue: 0.2
+                            toValue: 5.0
+                            valueNumber: root.appController ? root.appController.zoom : 1.0
+
+                            onMoved: function(value) {
+                                root.appController.zoom = value
+                            }
+                        }
+
+                        LabeledSlider {
+                            Layout.fillWidth: true
+                            label: "X Rotation"
+                            fromValue: -180
+                            toValue: 180
+                            valueNumber: root.appController ? root.appController.rotationX : 0
+
+                            onMoved: function(value) {
+                                root.appController.rotationX = value
+                            }
+                        }
+
+                        LabeledSlider {
+                            Layout.fillWidth: true
+                            label: "Y Rotation"
+                            fromValue: -180
+                            toValue: 180
+                            valueNumber: root.appController ? root.appController.rotationY : 0
+
+                            onMoved: function(value) {
+                                root.appController.rotationY = value
+                            }
                         }
                     }
 
-                    Rectangle { Layout.fillWidth: true; height: 1; color: "#E6E8EF" }
+                    Rectangle {
+                        Layout.fillWidth: true
+                        height: 1
+                        color: "#E6E8EF"
+                    }
 
                     Text {
                         text: "Model Path"
@@ -377,17 +443,15 @@ ApplicationWindow {
 
                             color: "#667085"
                             font.pixelSize: 10
-
                             wrapMode: TextEdit.WrapAnywhere
-
                             readOnly: true
                             selectByMouse: true
-
-                          //  background: null
                         }
                     }
 
-                    Item { Layout.fillHeight: true }
+                    Item {
+                        Layout.fillHeight: true
+                    }
                 }
             }
 
@@ -397,14 +461,51 @@ ApplicationWindow {
                 color: "#F4F5F7"
 
                 Rectangle {
+                    id: viewportContainer
                     anchors.fill: parent
                     anchors.margins: 18
                     radius: 12
-                    // color: "#11141C"
                     color: "#F4F4F4"
                     border.color: "#D8DCE5"
                     border.width: 1
                     clip: true
+
+                    focus: true
+                    activeFocusOnTab: true
+
+                    Component.onCompleted: forceActiveFocus()
+
+                    Keys.onPressed: function(event) {
+                        if (!root.appController)
+                            return
+
+                        if (event.key === Qt.Key_Left) {
+                            root.appController.rotationY -= 5
+                            event.accepted = true
+                        } else if (event.key === Qt.Key_Right) {
+                            root.appController.rotationY += 5
+                            event.accepted = true
+                        } else if (event.key === Qt.Key_Up) {
+                            root.appController.rotationX -= 5
+                            event.accepted = true
+                        } else if (event.key === Qt.Key_Down) {
+                            root.appController.rotationX += 5
+                            event.accepted = true
+                        }
+                    }
+
+                    WheelHandler {
+                        target: null
+
+                        onWheel: function(event) {
+                            if (!root.appController)
+                                return
+
+                            var step = event.angleDelta.y > 0 ? 0.1 : -0.1
+                            var newZoom = root.appController.zoom + step
+                            root.appController.zoom = Math.max(0.2, Math.min(5.0, newZoom))
+                        }
+                    }
 
                     OpenGLViewport {
                         id: viewport
@@ -416,6 +517,10 @@ ApplicationWindow {
                         zoom: root.appController ? root.appController.zoom : 1.0
                         rotationX: root.appController ? root.appController.rotationX : 0
                         rotationY: root.appController ? root.appController.rotationY : 0
+                    }
+
+                    TapHandler {
+                        onTapped: viewportContainer.forceActiveFocus()
                     }
 
                     Rectangle {
