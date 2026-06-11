@@ -15,6 +15,9 @@ class OpenGLViewport : public QQuickFramebufferObject
     Q_PROPERTY(float rotationX READ rotationX WRITE setRotationX NOTIFY rotationXChanged)
     Q_PROPERTY(float rotationY READ rotationY WRITE setRotationY NOTIFY rotationYChanged)
 
+    Q_PROPERTY(float panX READ panX WRITE setPanX NOTIFY panXChanged)
+    Q_PROPERTY(float panY READ panY WRITE setPanY NOTIFY panYChanged)
+
 public:
     explicit OpenGLViewport(QQuickItem* parent = nullptr);
 
@@ -33,6 +36,12 @@ public:
     float rotationY() const;
     void setRotationY(float value);
 
+    float panX() const;
+    void setPanX(float value);
+
+    float panY() const;
+    void setPanY(float value);
+
     QQuickFramebufferObject::Renderer* createRenderer() const override;
 
 signals:
@@ -43,6 +52,9 @@ signals:
     void rotationXChanged();
     void rotationYChanged();
 
+    void panXChanged();
+    void panYChanged();
+
 private:
     QString m_modelPath;
     QString m_texturePath;
@@ -51,6 +63,8 @@ private:
     float m_rotationX = 0.0f;
     float m_rotationY = 0.0f;
 
+    float m_panX = 0.0f;
+    float m_panY = 0.0f;
 };
 
 #endif

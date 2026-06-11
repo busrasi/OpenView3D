@@ -1,14 +1,16 @@
 #ifndef APP_CONTROLLER_H
 #define APP_CONTROLLER_H
 
-#include "core/Renderer.h"
-
 #include <QObject>
 #include <QString>
+#include <QVector>
 
 class AppController : public QObject
 {
     Q_OBJECT
+
+    Q_PROPERTY(int activeViewIndex READ activeViewIndex WRITE setActiveViewIndex NOTIFY activeViewIndexChanged)
+    Q_PROPERTY(int viewCount READ viewCount NOTIFY viewCountChanged)
 
     Q_PROPERTY(QString modelPath READ modelPath NOTIFY modelPathChanged)
     Q_PROPERTY(QString texturePath READ texturePath NOTIFY texturePathChanged)
@@ -19,6 +21,11 @@ class AppController : public QObject
 
 public:
     explicit AppController(QObject* parent = nullptr);
+
+    int activeViewIndex() const;
+    void setActiveViewIndex(int index);
+
+    int viewCount() const;
 
     QString modelPath() const;
     QString texturePath() const;
@@ -32,11 +39,15 @@ public:
     float rotationY() const;
     void setRotationY(float value);
 
+    Q_INVOKABLE bool addView();
     Q_INVOKABLE void loadModel(const QString& path);
     Q_INVOKABLE void loadTexture(const QString& path);
     Q_INVOKABLE void resetCamera();
 
 signals:
+    void activeViewIndexChanged();
+    void viewCountChanged();
+
     void modelPathChanged();
     void texturePathChanged();
     void zoomChanged();
@@ -44,7 +55,21 @@ signals:
     void rotationYChanged();
 
 private:
-    Renderer m_renderer;
+    struct ViewState {
+        QString modelPath;
+        QString texturePath;
+        float zoom = 1.0f;
+        float rotationX = 0.0f;
+        float rotationY = 0.0f;
+    };
+
+    ViewState& activeView();
+    const ViewState& activeView() const;
+
+private:
+    QVector<ViewState> m_views;
+    int m_activeViewIndex = 0;
+    static constexpr int MaxViews = 15;
 };
 
 #endif

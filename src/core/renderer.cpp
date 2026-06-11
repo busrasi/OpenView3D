@@ -3,6 +3,18 @@
 #include <QDebug>
 #include <QUrl>
 
+namespace
+{
+QString toLocalFilePath(const QString& path)
+{
+    if (path.startsWith("file://")) {
+        return QUrl(path).toLocalFile();
+    }
+
+    return path;
+}
+}
+
 Renderer::Renderer()
 {
     qDebug() << "Renderer created";
@@ -16,23 +28,21 @@ Renderer::~Renderer()
 bool Renderer::loadModel(const QString& path)
 {
     if (path.isEmpty()) {
+        qDebug() << "Renderer loadModel failed: empty path";
         return false;
     }
 
-    QString localPath = path;
-
-    if (localPath.startsWith("file:///")) {
-        localPath = QUrl(path).toLocalFile();
-    }
+    const QString localPath = toLocalFilePath(path);
 
     m_loader.vertices.clear();
     m_loader.uvs.clear();
     m_loader.normals.clear();
 
-    const bool loaded = m_loader.loadOBJ(localPath.toStdString().c_str());
+    const bool loaded = m_loader.loadOBJ(localPath.toUtf8().constData());
 
     if (!loaded) {
         qDebug() << "Renderer failed to load model:" << localPath;
+        m_modelPath.clear();
         return false;
     }
 
@@ -49,31 +59,32 @@ bool Renderer::loadModel(const QString& path)
 bool Renderer::loadTexture(const QString& path)
 {
     if (path.isEmpty()) {
+        qDebug() << "Renderer loadTexture failed: empty path";
         return false;
     }
 
-    QString localPath = path;
-
-    if (localPath.startsWith("file:///")) {
-        localPath = QUrl(path).toLocalFile();
-    }
-
-    m_texturePath = localPath;
+    m_texturePath = toLocalFilePath(path);
 
     qDebug() << "Renderer stored texture path:" << m_texturePath;
 
     return true;
 }
+
 void Renderer::setZoom(float zoom)
 {
-    m_zoom = zoom;
+    m_zoom = qMax(0.2f, qMin(5.0f, zoom));
     qDebug() << "Renderer zoom:" << m_zoom;
 }
 
 void Renderer::setRotation(float x, float y)
 {
+    // Convention:
+    // +X slider means upward/orbit-style pitch.
+    // +Y slider means right/orbit-style yaw.
+    // Actual sign correction is applied in OpenGLViewport.cpp model matrix.
     m_rotationX = x;
     m_rotationY = y;
+
     qDebug() << "Renderer rotation:" << m_rotationX << m_rotationY;
 }
 
@@ -82,6 +93,7 @@ void Renderer::resetCamera()
     m_zoom = 1.0f;
     m_rotationX = 0.0f;
     m_rotationY = 0.0f;
+
     qDebug() << "Renderer camera reset";
 }
 

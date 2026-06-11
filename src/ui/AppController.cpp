@@ -1,110 +1,158 @@
 #include "AppController.h"
 
 #include <QDebug>
+#include <QUrl>
+#include <QtMath>
 
 AppController::AppController(QObject* parent)
     : QObject(parent)
 {
+    m_views.append(ViewState{});
+}
+
+int AppController::activeViewIndex() const
+{
+    return m_activeViewIndex;
+}
+
+void AppController::setActiveViewIndex(int index)
+{
+    if (index < 0 || index >= m_views.size())
+        return;
+
+    if (m_activeViewIndex == index)
+        return;
+
+    m_activeViewIndex = index;
+
+    emit activeViewIndexChanged();
+    emit modelPathChanged();
+    emit texturePathChanged();
+    emit zoomChanged();
+    emit rotationXChanged();
+    emit rotationYChanged();
+}
+
+int AppController::viewCount() const
+{
+    return m_views.size();
+}
+
+AppController::ViewState& AppController::activeView()
+{
+    return m_views[m_activeViewIndex];
+}
+
+const AppController::ViewState& AppController::activeView() const
+{
+    return m_views[m_activeViewIndex];
 }
 
 QString AppController::modelPath() const
 {
-    return m_renderer.modelPath();
+    return activeView().modelPath;
 }
 
 QString AppController::texturePath() const
 {
-    return m_renderer.texturePath();
+    return activeView().texturePath;
 }
 
 float AppController::zoom() const
 {
-    return m_renderer.zoom();
+    return activeView().zoom;
 }
 
 void AppController::setZoom(float value)
 {
-    if (qFuzzyCompare(m_renderer.zoom(), value)) {
+    if (qFuzzyCompare(activeView().zoom, value))
         return;
-    }
 
-    m_renderer.setZoom(value);
+    activeView().zoom = value;
     emit zoomChanged();
 }
 
 float AppController::rotationX() const
 {
-    return m_renderer.rotationX();
+    return activeView().rotationX;
 }
 
 void AppController::setRotationX(float value)
 {
-    if (qFuzzyCompare(m_renderer.rotationX(), value)) {
+    if (qFuzzyCompare(activeView().rotationX, value))
         return;
-    }
 
-    m_renderer.setRotation(value, m_renderer.rotationY());
+    activeView().rotationX = value;
     emit rotationXChanged();
 }
 
 float AppController::rotationY() const
 {
-    return m_renderer.rotationY();
+    return activeView().rotationY;
 }
 
 void AppController::setRotationY(float value)
 {
-    if (qFuzzyCompare(m_renderer.rotationY(), value)) {
+    if (qFuzzyCompare(activeView().rotationY, value))
         return;
+
+    activeView().rotationY = value;
+    emit rotationYChanged();
+}
+
+bool AppController::addView()
+{
+    if (m_views.size() >= MaxViews) {
+        qDebug() << "Maximum view count reached:" << MaxViews;
+        return false;
     }
 
-    m_renderer.setRotation(m_renderer.rotationX(), value);
+    m_views.append(ViewState{});
+    m_activeViewIndex = m_views.size() - 1;
+
+    emit viewCountChanged();
+    emit activeViewIndexChanged();
+
+    emit modelPathChanged();
+    emit texturePathChanged();
+    emit zoomChanged();
+    emit rotationXChanged();
     emit rotationYChanged();
+
+    return true;
 }
 
 void AppController::loadModel(const QString& path)
 {
-    if (path.isEmpty()) {
+    if (path.isEmpty())
         return;
-    }
 
-    const bool loaded = m_renderer.loadModel(path);
-
-    if (!loaded) {
-        qDebug() << "AppController failed to load model:" << path;
-        return;
-    }
-
+    activeView().modelPath = path;
     emit modelPathChanged();
 
-    qDebug() << "AppController loaded model:" << path;
+    qDebug() << "View" << m_activeViewIndex << "model selected:" << path;
 }
 
 void AppController::loadTexture(const QString& path)
 {
-    if (path.isEmpty()) {
+    if (path.isEmpty())
         return;
-    }
 
-    const bool loaded = m_renderer.loadTexture(path);
-
-    if (!loaded) {
-        qDebug() << "AppController failed to store texture:" << path;
-        return;
-    }
-
+    activeView().texturePath = path;
     emit texturePathChanged();
 
-    qDebug() << "AppController selected texture:" << path;
+    qDebug() << "View" << m_activeViewIndex << "texture selected:" << path;
 }
 
 void AppController::resetCamera()
 {
-    m_renderer.resetCamera();
+    activeView().zoom = 1.0f;
+    activeView().rotationX = 0.0f;
+    activeView().rotationY = 0.0f;
 
     emit zoomChanged();
     emit rotationXChanged();
     emit rotationYChanged();
 
-    qDebug() << "AppController reset camera";
+    qDebug() << "View" << m_activeViewIndex << "camera reset";
 }
