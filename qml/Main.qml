@@ -557,7 +557,12 @@ ApplicationWindow {
                                 root.viewportPanY = startPanY - translation.y * 0.005
                             }
                         }
-
+                        HoverHandler {
+                            id: viewportHover
+                            cursorShape: objectDragHandler.active
+                                         ? Qt.ClosedHandCursor
+                                         : Qt.OpenHandCursor
+                        }
                         TapHandler {
                             onTapped: viewportContainer.forceActiveFocus()
                         }

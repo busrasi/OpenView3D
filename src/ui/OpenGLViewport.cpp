@@ -303,7 +303,12 @@ private:
 
         m_gridProgram.bind();
         m_gridProgram.setUniformValue("MVP", mvp);
-        m_gridProgram.setUniformValue("gridColor", 0.58f, 0.62f, 0.70f);
+        m_gridProgram.setUniformValue(
+            "gridColor",
+            0.45f,
+            0.48f,
+            0.55f
+            );
 
         glBindVertexArray(m_gridVao);
         glLineWidth(1.0f);
@@ -350,7 +355,7 @@ private:
 
                     void main()
                     {
-                        fragColor = vec4(gridColor, 0.35);
+                        fragColor = vec4(gridColor, 1.0);
                     }
                 )"
                 );
