@@ -1,0 +1,11 @@
+module OpenView3D
+
+Main 1.0 Main.qml
+
+ToolButtonCard 1.0 components/ToolButtonCard.qml
+LabeledSlider 1.0 components/LabeledSlider.qml
+ViewPresetCard 1.0 components/ViewPresetCard.qml
+SectionHeader 1.0 components/SectionHeader.qml
+
+SceneControlsPanel 1.0 panels/SceneControlsPanel.qml
+ViewportPanel 1.0 panels/ViewportPanel.qml

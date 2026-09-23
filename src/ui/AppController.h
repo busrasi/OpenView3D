@@ -4,6 +4,7 @@
 #include <QObject>
 #include <QString>
 #include <QVector>
+#include <QNetworkAccessManager>
 
 class AppController : public QObject
 {
@@ -43,6 +44,9 @@ public:
     Q_INVOKABLE void loadModel(const QString& path);
     Q_INVOKABLE void loadTexture(const QString& path);
     Q_INVOKABLE void resetCamera();
+    Q_INVOKABLE void closeView(int index);
+
+    Q_INVOKABLE void generateModel(const QString& imagePath);
 
 signals:
     void activeViewIndexChanged();
@@ -53,6 +57,10 @@ signals:
     void zoomChanged();
     void rotationXChanged();
     void rotationYChanged();
+
+    void generationStarted();
+    void modelGenerated(const QString& path);
+    void generationFailed(const QString& error);
 
 private:
     struct ViewState {
@@ -70,6 +78,8 @@ private:
     QVector<ViewState> m_views;
     int m_activeViewIndex = 0;
     static constexpr int MaxViews = 15;
+
+    QNetworkAccessManager* m_networkManager = nullptr;
 };
 
 #endif

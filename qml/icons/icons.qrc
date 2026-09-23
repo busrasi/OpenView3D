@@ -1,0 +1,26 @@
+<RCC>
+    <qresource prefix="/icons">
+        <file>cube.svg</file>
+        <file>cursor.svg</file>
+        <file>icon.png</file>
+        <file>icon_small.png</file>
+        <file>icon16.png</file>
+        <file>icon24.png</file>
+        <file>icon32.png</file>
+        <file>icon48.png</file>
+        <file>icon64.png</file>
+        <file>icon128.png</file>
+        <file>icon256.png</file>
+        <file>icon512.png</file>
+        <file>icons.qrc</file>
+        <file>openview3d-icon.svg</file>
+        <file>reset.svg</file>
+        <file>rotate.svg</file>
+        <file>texture.svg</file>
+        <file>view_front.svg</file>
+        <file>view_iso.svg</file>
+        <file>view_right.svg</file>
+        <file>view_top.svg</file>
+        <file>zoom.svg</file>
+    </qresource>
+</RCC>

@@ -91,6 +91,8 @@ qt_add_qml_module(OpenView3D
     VERSION 1.0
     QML_FILES
         qml/Main.qml
+        RESOURCES
+        qml/icons/icons.qrc
         qml/icons/cube.svg
         qml/icons/texture.svg
         qml/icons/reset.svg
@@ -99,6 +101,21 @@ qt_add_qml_module(OpenView3D
         qml/icons/cursor.svg
         qml/icons/openview3d-icon.svg
         qml/icons/icon256.png
+        qml/icons/view_front.svg
+        qml/icons/view_right.svg
+        qml/icons/view_top.svg
+        qml/icons/view_iso.svg
+        resources/model_vase/model.obj
+        resources/model_vase/texture_0.png
+        resources/models/capsule.obj
+        QML_FILES qml/components/ToolButtonCard.qml
+        QML_FILES qml/components/LabeledSlider.qml
+        QML_FILES qml/components/ViewPresetCard.qml
+        QML_FILES qml/components/SectionHeader.qml
+        QML_FILES qml/panels/SceneControlsPanel.qml
+        QML_FILES qml/panels/ViewportPanel.qml
+        QML_FILES qml/components/AssetBrowser.qml
+        QML_FILES qml/components/GenerateModelCard.qml
 )
 
 
