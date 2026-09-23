@@ -62,7 +62,8 @@ signals:
     void modelGenerated(const QString& path);
     void generationFailed(const QString& error);
 
-private:
+public:
+    // The existing active view is the selected model record; no separate selection store.
     struct ViewState {
         QString modelPath;
         QString texturePath;
@@ -70,6 +71,10 @@ private:
         float rotationX = 0.0f;
         float rotationY = 0.0f;
     };
+
+    const ViewState* selectedModel() const { return &activeView(); }
+
+private:
 
     ViewState& activeView();
     const ViewState& activeView() const;

@@ -171,16 +171,17 @@ public:
         // Drawn in the XZ plane below the model using the same viewer convention.
         renderGroundGrid(projection, view, worldConvention);
 
-        QMatrix4x4 model;
-        model.translate(-m_center.x, -m_center.y, -m_center.z);
-        model.scale(m_scale * 2.0f);
-        model = worldConvention * model;
+        QMatrix4x4 model = worldConvention;
 
         // Final control convention:
         // X Rotation increase -> model tilts upward/forward.
         // Y Rotation increase -> model turns clockwise/right in the viewport.
         model.rotate(-m_rotationX, 1.0f, 0.0f, 0.0f);
         model.rotate( m_rotationY, 0.0f, 1.0f, 0.0f);
+        // Qt post-multiplies: center the source geometry first, then scale/rotate.
+        // Translating before scaling leaves off-origin OBJ models outside the view.
+        model.scale(m_scale * 2.0f);
+        model.translate(-m_center.x, -m_center.y, -m_center.z);
 
         // Mouse drag / object pan:
         // QML mouse Y increases downward, but viewer +Y is upward.

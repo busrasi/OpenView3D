@@ -17,6 +17,7 @@ ApplicationWindow {
     color: "#F7F8FA"
 
     property var appController
+    property var chatController
     property bool transformExpanded: false
     property real viewportPanX: 0.0
     property real viewportPanY: 0.0
@@ -237,6 +238,11 @@ ApplicationWindow {
                 onActivePresetChanged: function(presetName) {
                     root.activePreset = presetName
                 }
+            }
+            ChatPanel {
+                Layout.preferredWidth: 320
+                Layout.fillHeight: true
+                controller: root.chatController
             }
         }
     }

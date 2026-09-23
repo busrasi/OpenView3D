@@ -1,6 +1,9 @@
 # OpenView3D
 OpenView3D
 
+AI OBJ mesh editing is available through the right-side assistant. See
+[setup, architecture, build commands, verification and limitations](docs/AI_MESH_EDITING.md).
+
 <img width="1278" height="786" alt="Open3dView_06-05-2026" src="https://github.com/user-attachments/assets/1bcd824b-6aa4-480c-86e2-9696c9590408" />
 
 # OpenView3D

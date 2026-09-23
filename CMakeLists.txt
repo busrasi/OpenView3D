@@ -39,12 +39,39 @@ find_package(Qt6 REQUIRED COMPONENTS
     Qml
     Quick
     QuickControls2
+    Network
+    Concurrent
 )
 
 qt_standard_project_setup(REQUIRES 6.5)
 
 # Vendored dependencies under thirdparty/
 add_subdirectory(thirdparty)
+# The viewer links static GLEW; the unused legacy shared target fails with modern MinGW.
+set_target_properties(libglew_shared PROPERTIES EXCLUDE_FROM_ALL TRUE)
+
+# Pinned robust mesh boolean backend. Keep it replaceable behind MeshEditingService.
+include(FetchContent)
+set(MANIFOLD_TEST OFF CACHE BOOL "" FORCE)
+set(MANIFOLD_CROSS_SECTION OFF CACHE BOOL "" FORCE)
+set(MANIFOLD_CBIND OFF CACHE BOOL "" FORCE)
+set(MANIFOLD_PYBIND OFF CACHE BOOL "" FORCE)
+set(MANIFOLD_PAR OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF)
+FetchContent_Declare(manifold
+    GIT_REPOSITORY https://github.com/elalish/manifold.git
+    GIT_TAG 798d83c8d7fabcddd23c1617097b95ba40f2597c # v3.3.2
+)
+FetchContent_MakeAvailable(manifold)
+
+add_library(openview_mesh STATIC src/mesh/MeshEditingService.cpp src/mesh/MeshEditingService.h src/ai/MeshOperation.h)
+target_include_directories(openview_mesh PUBLIC "${CMAKE_SOURCE_DIR}/src")
+target_link_libraries(openview_mesh PUBLIC Qt6::Core manifold)
+
+add_library(openview_ai STATIC src/ai/AIProvider.cpp src/ai/AIProvider.h
+    src/ai/ChatController.cpp src/ai/ChatController.h src/ui/AppController.cpp src/ui/AppController.h)
+target_include_directories(openview_ai PUBLIC "${CMAKE_SOURCE_DIR}/src")
+target_link_libraries(openview_ai PUBLIC openview_mesh Qt6::Network Qt6::Concurrent)
 
 # -------------------------------------------------------------------------------------------------
 # Source Files
@@ -57,7 +84,6 @@ set(OPENVIEW3D_HEADERS
     "${CMAKE_SOURCE_DIR}/src/core/texture.h"
     "${CMAKE_SOURCE_DIR}/src/core/renderer.h"
     "${CMAKE_SOURCE_DIR}/src/ui/OpenGLViewport.h"
-    "${CMAKE_SOURCE_DIR}/src/ui/AppController.h"
 
 )
 
@@ -70,7 +96,6 @@ set(OPENVIEW3D_SOURCES
     "${CMAKE_SOURCE_DIR}/src/core/texture.cpp"
     "${CMAKE_SOURCE_DIR}/src/core/renderer.cpp"
     "${CMAKE_SOURCE_DIR}/src/ui/OpenGLViewport.cpp"
-    "${CMAKE_SOURCE_DIR}/src/ui/AppController.cpp"
 )
 
 # -------------------------------------------------------------------------------------------------
@@ -116,6 +141,7 @@ qt_add_qml_module(OpenView3D
         QML_FILES qml/panels/ViewportPanel.qml
         QML_FILES qml/components/AssetBrowser.qml
         QML_FILES qml/components/GenerateModelCard.qml
+        QML_FILES qml/panels/ChatPanel.qml
 )
 
 
@@ -157,6 +183,7 @@ endif()
 # Link Libraries
 # -------------------------------------------------------------------------------------------------
 target_link_libraries(OpenView3D PRIVATE
+    openview_ai
     OpenGL::GL
     glfw
     libglew_static
@@ -184,4 +211,13 @@ if(WIN32)
     set_target_properties(OpenView3D PROPERTIES
         WIN32_EXECUTABLE TRUE
     )
+endif()
+
+include(CTest)
+if(BUILD_TESTING)
+    target_compile_definitions(OpenView3D PRIVATE OPENVIEW3D_TESTING)
+    add_executable(MeshEditingTests tests/MeshEditingTests.cpp src/core/loader.cpp)
+    target_include_directories(MeshEditingTests PRIVATE "${CMAKE_SOURCE_DIR}/thirdparty/glm-0.9.7.1")
+    target_link_libraries(MeshEditingTests PRIVATE openview_ai libglew_static)
+    add_test(NAME MeshEditingTests COMMAND MeshEditingTests)
 endif()
