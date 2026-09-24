@@ -56,13 +56,18 @@ Rectangle {
         RowLayout {
             visible: panel.controller.busy
             BusyIndicator { running: panel.controller.busy; Layout.preferredWidth: 26; Layout.preferredHeight: 26 }
-            Label { text: "Working..." }
+            Label { text: panel.controller.lastIntent === "SCENE_GENERATION" ? panel.controller.sceneStatus : "Working..." }
+        }
+        Button {
+            text: "Clear Generated Scene"
+            enabled: !panel.controller.busy
+            onClicked: panel.controller.clearGeneratedScene()
         }
         TextField {
             id: input
             objectName: "aiChatInput"
             Layout.fillWidth: true
-            placeholderText: "Make a hole through the center"
+            placeholderText: "Show this model in a modern room"
             maximumLength: 4000
             enabled: !panel.controller.busy
             onAccepted: panel.submit()

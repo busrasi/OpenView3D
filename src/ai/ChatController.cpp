@@ -1,4 +1,6 @@
 #include "ChatController.h"
+#include "RequestRouter.h"
+#include "scene/SceneGenerationController.h"
 #include "ui/AppController.h"
 #include "mesh/MeshEditingService.h"
 #include <QFileInfo>
@@ -9,6 +11,13 @@ ChatController::ChatController(AppController* app, QObject* parent)
     : QObject(parent), m_app(app) {
     m_provider = qgetenv("OPENAI_API_KEY").trimmed().isEmpty()
         ? static_cast<AIProvider*>(new MockAIProvider(this)) : new OpenAIProvider(this);
+    connect(app, &AppController::renderingFailed, this, [this](const QString& error) { append("assistant", "Rendering error: " + error); });
+    m_sceneController = new SceneGenerationController(app,this);
+    connect(m_sceneController, &SceneGenerationController::finished, this, &ChatController::finish);
+    connect(m_sceneController, &SceneGenerationController::stateChanged, this, &ChatController::stateChanged);
+    connect(app, &AppController::meshChanged, this, [this] {
+        if (!m_app->modelError().isEmpty()) append("assistant", "Error: " + m_app->modelError());
+    });
     connect(app, &AppController::modelPathChanged, this, [this] {
         ++m_selectionRevision;
         emit selectedModelChanged();
@@ -16,7 +25,7 @@ ChatController::ChatController(AppController* app, QObject* parent)
     connect(m_provider, &AIProvider::operationReady, this, &ChatController::execute);
     connect(m_provider, &AIProvider::answerReady, this, [this](const QString& text) { finish(text); });
     connect(m_provider, &AIProvider::failed, this, [this](const QString& error) { finish(error, true); });
-    append("assistant", "Select an OBJ and ask me to make a hole through its center. The cut uses object-space Z; radius defaults to 10% of the smaller XY size. Your original file is kept.");
+    append("assistant", "Select an OBJ and ask: Show this vase in a modern room on a wooden table. You can also request a pedestal, a cozy room, or a centered through-hole. Original files are kept.");
 }
 QString ChatController::selectedModelName() const {
     return QFileInfo(m_app->selectedModel()->modelPath).fileName();
@@ -39,6 +48,19 @@ void ChatController::send(const QString& text) {
     if (!selected || selected->modelPath.isEmpty()) {
         finish("No model selected. Load an OBJ into the active view first.", true);
         return;
+    }
+    const auto intent = RequestRouter::route(text, bool(selected->scene));
+    m_lastIntent = RequestRouter::name(intent);
+    if (intent == RequestRouter::ModelQuery) { finish("Selected model: " + selectedModelName()); return; }
+    if (intent == RequestRouter::ClearScene) { clearGeneratedScene(); return; }
+    if (intent == RequestRouter::Unsupported) {
+        finish("Try 'Show this model in a modern room on a wooden table', 'Put this model on a pedestal in a minimalist room', 'What model is currently selected?', or 'Make a hole through the center'.");
+        return;
+    }
+    if (intent == RequestRouter::SceneGeneration) {
+        m_busy = true; m_error.clear(); emit stateChanged();
+        append("assistant", "Scene Generation: composing an environment for " + selectedModelName() + "...");
+        m_sceneController->start(text.trimmed()); return;
     }
     m_sourcePath = selected->modelPath;
     m_requestRevision = m_selectionRevision;
@@ -73,4 +95,11 @@ void ChatController::execute(const QJsonObject& command) {
     } catch (const std::exception& error) {
         finish(QString::fromUtf8(error.what()), true);
     }
+}
+
+QString ChatController::sceneStatus() const { return m_sceneController->status(); }
+void ChatController::clearGeneratedScene() {
+    if (m_busy) return;
+    m_app->clearGeneratedScene();
+    finish("Generated environment cleared. Your original model is preserved.");
 }

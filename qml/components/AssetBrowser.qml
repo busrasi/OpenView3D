@@ -35,7 +35,7 @@ Rectangle {
                 spacing: 8
 
                 Text {
-                    text: browser.expanded ? "˄" : "˅"
+                    text: browser.expanded ? "Ë„" : "Ë…"
                     color: "#5E7BFF"
                     font.pixelSize: 15
                     font.weight: Font.DemiBold
@@ -86,22 +86,22 @@ Rectangle {
                 {
                     name: "vase.obj",
                     type: "model",
-                    path: "file:///C:/Users/busra/OneDrive/Documents/OpenView3D/resources/model_vase/model.obj"
+                    path: "qrc:/qt/qml/OpenView3D/resources/model_vase/model.obj"
                 },
                 {
                     name: "capsule.obj",
                     type: "model",
-                    path: "file:///C:/Users/busra/OneDrive/Documents/OpenView3D/resources/models/capsule.obj"
+                    path: "qrc:/qt/qml/OpenView3D/resources/models/capsule.obj"
                 },
                 {
                     name: "texture_0.png",
                     type: "texture",
-                    path: "file:///C:/Users/busra/OneDrive/Documents/OpenView3D/resources/model_vase/texture_0.png"
+                    path: "qrc:/qt/qml/OpenView3D/resources/model_vase/texture_0.png"
                 },
                 {
                     name: "capsule0.png",
                     type: "texture",
-                    path: "file:///C:/Users/busra/OneDrive/Documents/OpenView3D/resources/models/capsule0.png"
+                    path: "qrc:/qt/qml/OpenView3D/resources/models/capsule0.png"
                 }
             ]
             delegate: Item {

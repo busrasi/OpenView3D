@@ -26,6 +26,7 @@ class Loader {
         std::vector<glm::vec2> uvs;
         std::vector<glm::vec3> normals;
 
+        glm::vec3 minimum{0}, maximum{0};
         GLuint vertexbuffer;
         GLuint uvbuffer;
 };

@@ -1,4 +1,7 @@
+#include "core/loader.h"
 #include "AppController.h"
+#include <QFutureWatcher>
+#include <QtConcurrent/QtConcurrentRun>
 
 #include <QDebug>
 #include <QUrl>
@@ -9,6 +12,9 @@
 #include <QDateTime>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QStandardPaths>
+#include <QCryptographicHash>
+#include <QSaveFile>
 #include <QNetworkRequest>
 #include <QNetworkReply>
 
@@ -35,6 +41,9 @@ void AppController::setActiveViewIndex(int index)
     m_activeViewIndex = index;
 
     emit activeViewIndexChanged();
+    ++m_selectionRevision;
+    emit meshChanged();
+    emit sceneChanged();
     emit modelPathChanged();
     emit texturePathChanged();
     emit zoomChanged();
@@ -121,6 +130,9 @@ bool AppController::addView()
 
     emit viewCountChanged();
     emit activeViewIndexChanged();
+    ++m_selectionRevision;
+    emit meshChanged();
+    emit sceneChanged();
     emit modelPathChanged();
     emit texturePathChanged();
     emit zoomChanged();
@@ -140,7 +152,63 @@ void AppController::loadModel(const QString& path)
     if (localPath.startsWith("file:"))
         localPath = QUrl(localPath).toLocalFile();
 
+    if (localPath.startsWith("qrc:")) localPath = ":" + QUrl(localPath).path();
+
     activeView().modelPath = localPath;
+    activeView().mesh.reset();
+    activeView().scene.reset();
+    activeView().loadError.clear();
+    const quint64 token = ++m_loadToken;
+    activeView().loadToken = token;
+    struct LoadResult { MeshPtr mesh; QString error, path; };
+    auto* watcher = new QFutureWatcher<LoadResult>(this);
+    connect(watcher, &QFutureWatcher<LoadResult>::finished, this, [this,watcher,token] {
+        const auto result = watcher->result(); watcher->deleteLater();
+        for (int i=0;i<m_views.size();++i) if (m_views[i].loadToken == token) {
+            m_views[i].mesh = result.mesh; m_views[i].loadError = result.error;
+            const bool relocated = !result.path.isEmpty() && m_views[i].modelPath != result.path;
+            if (relocated) m_views[i].modelPath = result.path;
+            if (i == m_activeViewIndex) {
+                if (relocated) { ++m_selectionRevision; emit modelPathChanged(); }
+                emit meshChanged();
+            }
+            break;
+        }
+    });
+    watcher->setFuture(QtConcurrent::run([localPath] {
+        LoadResult result;
+        try {
+            QString sourcePath = localPath;
+            if (localPath.startsWith(":")) {
+                // Bundled models become editable local files without installation-specific paths.
+                const auto id = QString::fromLatin1(QCryptographicHash::hash(localPath.toUtf8(),QCryptographicHash::Sha256).toHex().left(16));
+                QDir directory(QDir(QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation)).filePath("bundled/" + id));
+                if (!directory.mkpath(".")) throw std::runtime_error("Cannot create bundled-model storage.");
+                sourcePath = directory.filePath(QFileInfo(localPath).fileName());
+                const QDir resourceDirectory(QFileInfo(localPath).path());
+                for (const auto& name : resourceDirectory.entryList(QDir::Files)) {
+                    const auto destination = directory.filePath(name);
+                    if (QFileInfo::exists(destination)) continue;
+                    QFile resource(resourceDirectory.filePath(name)); QSaveFile output(destination);
+                    if (!resource.open(QIODevice::ReadOnly) || !output.open(QIODevice::WriteOnly))
+                        throw std::runtime_error("Cannot extract bundled model.");
+                    while (!resource.atEnd()) {
+                        const auto block = resource.read(1024*1024);
+                        if (block.isEmpty() || output.write(block) != block.size()) throw std::runtime_error("Cannot copy bundled model.");
+                    }
+                    if (!output.commit()) throw std::runtime_error("Cannot save bundled model.");
+                }
+            }
+            auto mesh = std::make_shared<Loader>();
+            if (!mesh->loadOBJ(sourcePath.toUtf8().constData())) result.error = "Could not load selected OBJ. Check the file and its geometry.";
+            else { result.mesh = mesh; result.path = sourcePath; }
+        } catch (const std::exception& e) { result.error = QString::fromUtf8(e.what()); }
+        catch (...) { result.error = "OBJ loading failed (invalid or excessively large mesh)."; }
+        return result;
+    }));
+    ++m_selectionRevision;
+    emit meshChanged();
+    emit sceneChanged();
     emit modelPathChanged();
 
     qDebug() << "View" << m_activeViewIndex << "model selected:" << localPath;
@@ -155,6 +223,8 @@ void AppController::loadTexture(const QString& path)
 
     if (localPath.startsWith("file:"))
         localPath = QUrl(localPath).toLocalFile();
+
+    if (localPath.startsWith("qrc:")) localPath = ":" + QUrl(localPath).path();
 
     activeView().texturePath = localPath;
     emit texturePathChanged();
@@ -190,6 +260,9 @@ void AppController::closeView(int index)
 
     emit viewCountChanged();
     emit activeViewIndexChanged();
+    ++m_selectionRevision;
+    emit meshChanged();
+    emit sceneChanged();
     emit modelPathChanged();
     emit texturePathChanged();
     emit zoomChanged();
@@ -291,4 +364,24 @@ void AppController::generateModel(const QString& imagePath)
         loadModel(absoluteObjPath);
         emit modelGenerated(absoluteObjPath);
     });
+}
+SelectedModelSnapshot AppController::selectedSnapshot() const {
+    SelectedModelSnapshot s;
+    s.path = activeView().modelPath; s.name = QFileInfo(s.path).fileName(); s.revision = m_selectionRevision;
+    if (activeView().mesh) {
+        const auto& a = activeView().mesh->minimum;
+        const auto& b = activeView().mesh->maximum;
+        s.minimum = {a.x,a.y,a.z}; s.maximum = {b.x,b.y,b.z};
+    }
+    if (activeView().scene) s.transform = activeView().scene->heroTransform;
+    return s;
+}
+void AppController::applyScene(ScenePtr scene) {
+    activeView().scene = std::move(scene);
+    resetCamera();
+    emit sceneChanged();
+}
+void AppController::clearGeneratedScene() {
+    ++m_selectionRevision; // Discard in-flight staging results as well.
+    activeView().scene.reset(); resetCamera(); emit sceneChanged();
 }

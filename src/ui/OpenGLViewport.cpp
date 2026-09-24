@@ -17,6 +17,12 @@
 #include <glm/glm.hpp>
 
 #include <vector>
+#include <QPointer>
+#include <cmath>
+#include <algorithm>
+#include <map>
+#include <QQuickOpenGLUtils>
+#include <QScopeGuard>
 
 class ViewportRenderer final
     : public QQuickFramebufferObject::Renderer,
@@ -27,6 +33,12 @@ public:
 
     ~ViewportRenderer() override
     {
+        const GLuint texture = m_texture.textureID();
+        if (texture) glDeleteTextures(1, &texture);
+        for (const auto& entry : m_assetBuffers) {
+            glDeleteBuffers(1, &entry.second.vbo);
+            glDeleteVertexArrays(1, &entry.second.vao);
+        }
         if (m_gridVbo != 0) {
             glDeleteBuffers(1, &m_gridVbo);
             m_gridVbo = 0;
@@ -76,36 +88,15 @@ public:
         m_panX = viewport->panX();
         m_panY = viewport->panY();
 
-        if (m_modelPath != viewport->modelPath()) {
-            m_modelPath = viewport->modelPath();
-
-            qDebug() << "ViewportRenderer received model path:" << m_modelPath;
-
-            if (m_modelPath.isEmpty()) {
-                m_modelLoaded = false;
-                m_initialized = false;
-            } else {
-                QString localPath = m_modelPath;
-
-                if (localPath.startsWith("file://")) {
-                    localPath = QUrl(m_modelPath).toLocalFile();
-                }
-
-                m_loader.vertices.clear();
-                m_loader.uvs.clear();
-                m_loader.normals.clear();
-
-                m_modelLoaded = m_loader.loadOBJ(localPath.toUtf8().constData());
-
-                qDebug() << "ViewportRenderer model loaded:" << m_modelLoaded;
-                qDebug() << "Vertex count:" << m_loader.vertices.size();
-                qDebug() << "UV count:" << m_loader.uvs.size();
-                qDebug() << "Normal count:" << m_loader.normals.size();
-
-                m_initialized = false;
-            }
+        m_viewport = viewport;
+        const auto mesh = viewport->meshData().value<MeshPtr>();
+        if (m_mesh != mesh) {
+            m_mesh = mesh;
+            m_modelLoaded = bool(mesh);
+            m_initialized = false;
+            m_errorReported = false;
         }
-
+        m_scene = viewport->sceneData().value<ScenePtr>();
         if (m_texturePath != viewport->texturePath()) {
             m_texturePath = viewport->texturePath();
 
@@ -119,6 +110,13 @@ public:
     void render() override
     {
         initializeOpenGLFunctions();
+        const auto restoreQtState = qScopeGuard([] { QQuickOpenGLUtils::resetOpenGLState(); });
+        if (!m_scene && !m_assetBuffers.empty()) {
+            for (const auto& entry : m_assetBuffers) {
+                glDeleteBuffers(1,&entry.second.vbo); glDeleteVertexArrays(1,&entry.second.vao);
+            }
+            m_assetBuffers.clear();
+        }
 
         if (m_textureReloadPending) {
             m_textureReloadPending = false;
@@ -143,9 +141,11 @@ public:
         }
 
         if (!m_initialized) {
+            reportError("Could not create model rendering resources.");
             return;
         }
 
+        if (m_scene) { renderScene(width,height); return; }
         QMatrix4x4 projection;
         const float aspect = height > 0
                                  ? static_cast<float>(width) / static_cast<float>(height)
@@ -196,6 +196,77 @@ public:
     }
 
 private:
+    void reportError(const QString& error) {
+        if (m_errorReported || !m_viewport) return;
+        m_errorReported = true;
+        QMetaObject::invokeMethod(m_viewport.data(), [item=m_viewport,error] {
+            if (item) emit item->renderingFailed(error);
+        }, Qt::QueuedConnection);
+    }
+    bool initializeAssets() {
+        // Retain immutable assets shared by consecutive scenes; release unused GPU buffers.
+        for (auto it=m_assetBuffers.begin();it!=m_assetBuffers.end();) {
+            if (!m_scene->assets.contains(it->first)) {
+                glDeleteBuffers(1,&it->second.vbo); glDeleteVertexArrays(1,&it->second.vao);
+                it=m_assetBuffers.erase(it);
+            } else ++it;
+        }
+        for (auto it=m_scene->assets.begin();it!=m_scene->assets.end();++it) {
+            if (m_assetBuffers.count(it.key())) continue;
+            const auto& vertices=it.value()->vertices;
+            AssetBuffers buffers;
+            glGenVertexArrays(1,&buffers.vao); glBindVertexArray(buffers.vao);
+            glGenBuffers(1,&buffers.vbo); glBindBuffer(GL_ARRAY_BUFFER,buffers.vbo);
+            glBufferData(GL_ARRAY_BUFFER,GLsizeiptr(vertices.size()*sizeof(float)),vertices.data(),GL_STATIC_DRAW);
+            glEnableVertexAttribArray(0); glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,6*sizeof(float),nullptr);
+            glEnableVertexAttribArray(2); glVertexAttribPointer(2,3,GL_FLOAT,GL_FALSE,6*sizeof(float),reinterpret_cast<void*>(3*sizeof(float)));
+            glBindVertexArray(0);
+            if (glGetError()!=GL_NO_ERROR || !buffers.vao || !buffers.vbo) {
+                if (buffers.vao) glDeleteVertexArrays(1,&buffers.vao);
+                if (buffers.vbo) glDeleteBuffers(1,&buffers.vbo);
+                reportError("Could not allocate environment geometry on the GPU."); return false;
+            }
+            buffers.count=GLsizei(vertices.size()/6);
+            m_assetBuffers.emplace(it.key(),buffers);
+        }
+        return true;
+    }    void renderScene(int width, int height) {
+        if (!initializeAssets()) return;
+        const float aspect = float(width)/std::max(1,height);
+        const float halfFov = std::min(.392699f,std::atan(std::tan(.392699f)*aspect));
+        const float distance = m_scene->cameraRadius / std::sin(halfFov) * std::max(.1f,m_zoom);
+        const float yaw = (.35f + m_rotationY*.0174533f);
+        const float pitch = std::clamp(.24f + m_rotationX*.0174533f,-1.45f,1.45f);
+        const auto target = m_scene->cameraTarget + QVector3D(m_panX,-m_panY,0);
+        const auto camera = target + QVector3D(std::sin(yaw)*std::cos(pitch),std::sin(pitch),std::cos(yaw)*std::cos(pitch))*distance;
+        QMatrix4x4 view, projection;
+        view.lookAt(camera,target,{0,1,0});
+        projection.perspective(45,aspect,.01f,std::max(100.f,distance+(m_scene->maximum-m_scene->minimum).length()*2));
+        // Qt Quick presents this FBO vertically inverted. Correct presentation in
+        // clip space, leaving the room, hero, camera and lighting consistently Y-up.
+        projection(1,1) = -projection(1,1);
+        glDisable(GL_BLEND); glDisable(GL_CULL_FACE);
+        renderModel(projection,view,m_scene->heroTransform,camera);
+        m_program.bind();
+        m_program.setUniformValue("useTexture",false); m_program.setUniformValue("useNormals",true);
+
+        for (const auto& object : m_scene->objects) {
+            // Cut away the wall facing an outside camera, so orbiting never hides the hero.
+            if (object.id.endsWith("/left_wall") && camera.x() < -m_scene->spec.width/2) continue;
+            if (object.id.endsWith("/back_wall") && camera.z() < -m_scene->spec.depth/2) continue;
+            m_program.setUniformValue("MVP",projection*view*object.transform);
+            m_program.setUniformValue("ModelMatrix",object.transform);
+            m_program.setUniformValue("materialColor",object.material.color);
+            m_program.setUniformValue("specularStrength",object.material.specular);
+            m_program.setUniformValue("shininess",object.material.shininess);
+            const auto buffer = m_assetBuffers.find(object.asset);
+            if (buffer == m_assetBuffers.end()) { reportError("Scene references a missing asset."); continue; }
+            glBindVertexArray(buffer->second.vao);
+            glDrawArrays(GL_TRIANGLES,0,buffer->second.count);
+        }
+        glBindVertexArray(0); m_program.release();
+        if (glGetError() != GL_NO_ERROR) reportError("OpenGL reported an error while rendering the generated scene.");
+    }
     void loadTextureIfNeeded()
     {
         m_textureLoaded = false;
@@ -241,7 +312,7 @@ private:
         const bool canUseTexture = m_textureLoaded
                                    && m_texture.textureID() != 0
                                    && m_uvbo != 0
-                                   && m_loader.uvs.size() == m_loader.vertices.size();
+                                   && m_mesh->uvs.size() == m_mesh->vertices.size();
 
         if (canUseTexture) {
             glActiveTexture(GL_TEXTURE0);
@@ -259,23 +330,25 @@ private:
         m_program.setUniformValue("ModelMatrix", model);
 
         const bool canUseNormals = m_normalbo != 0
-                                   && m_loader.normals.size() == m_loader.vertices.size();
+                                   && m_mesh->normals.size() == m_mesh->vertices.size();
 
         m_program.setUniformValue("useNormals", canUseNormals);
 
         // Fixed studio-style light: left, top, front.
         // In the finalized viewer convention:
         // X negative = left, Y positive = top, Z positive = camera/front.
-        m_program.setUniformValue("lightDirection", QVector3D(-0.45f, 0.75f, 0.55f).normalized());
+        m_program.setUniformValue("lightDirection", (m_scene ? m_scene->light.direction : QVector3D(-.45f,.75f,.55f)).normalized());
         m_program.setUniformValue("cameraPosition", cameraPosition);
 
-        m_program.setUniformValue("ambientStrength", 0.40f);
-        m_program.setUniformValue("diffuseStrength", 0.70f);
+        m_program.setUniformValue("materialColor", m_scene ? QVector3D(.65f,.71f,.76f) : QVector3D(.22f,.24f,.28f));
+        m_program.setUniformValue("lightColor", m_scene ? m_scene->light.color : QVector3D(1,1,1));
+        m_program.setUniformValue("ambientStrength", m_scene ? m_scene->light.ambient : .4f);
+        m_program.setUniformValue("diffuseStrength", m_scene ? m_scene->light.diffuse : .7f);
         m_program.setUniformValue("specularStrength", 0.15f);
         m_program.setUniformValue("shininess", 96.0f);
 
         glBindVertexArray(m_vao);
-        glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(m_loader.vertices.size()));
+        glDrawArrays(GL_TRIANGLES, 0, static_cast<GLsizei>(m_mesh->vertices.size()));
         glBindVertexArray(0);
 
         m_program.release();
@@ -440,19 +513,13 @@ private:
 
     void initializeModelBuffers()
     {
-        if (m_loader.vertices.empty()) {
+        if (m_mesh->vertices.empty()) {
             qDebug() << "No vertices available for rendering.";
             return;
         }
 
-        glm::vec3 minBounds(FLT_MAX);
-        glm::vec3 maxBounds(-FLT_MAX);
-
-        for (const auto& vertex : m_loader.vertices) {
-            minBounds = glm::min(minBounds, vertex);
-            maxBounds = glm::max(maxBounds, vertex);
-        }
-
+        const auto minBounds = m_mesh->minimum;
+        const auto maxBounds = m_mesh->maximum;
         m_center = (minBounds + maxBounds) * 0.5f;
 
         const glm::vec3 size = maxBounds - minBounds;
@@ -521,8 +588,8 @@ private:
         glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
         glBufferData(
             GL_ARRAY_BUFFER,
-            static_cast<GLsizeiptr>(m_loader.vertices.size() * sizeof(glm::vec3)),
-            m_loader.vertices.data(),
+            static_cast<GLsizeiptr>(m_mesh->vertices.size() * sizeof(glm::vec3)),
+            m_mesh->vertices.data(),
             GL_STATIC_DRAW
             );
 
@@ -536,13 +603,13 @@ private:
             reinterpret_cast<void*>(0)
             );
 
-        if (!m_loader.uvs.empty() && m_loader.uvs.size() == m_loader.vertices.size()) {
+        if (!m_mesh->uvs.empty() && m_mesh->uvs.size() == m_mesh->vertices.size()) {
             glGenBuffers(1, &m_uvbo);
             glBindBuffer(GL_ARRAY_BUFFER, m_uvbo);
             glBufferData(
                 GL_ARRAY_BUFFER,
-                static_cast<GLsizeiptr>(m_loader.uvs.size() * sizeof(glm::vec2)),
-                m_loader.uvs.data(),
+                static_cast<GLsizeiptr>(m_mesh->uvs.size() * sizeof(glm::vec2)),
+                m_mesh->uvs.data(),
                 GL_STATIC_DRAW
                 );
 
@@ -557,17 +624,17 @@ private:
                 );
         } else {
             qDebug() << "Texture disabled: missing UVs or UV/vertex count mismatch."
-                     << "vertices:" << m_loader.vertices.size()
-                     << "uvs:" << m_loader.uvs.size();
+                     << "vertices:" << m_mesh->vertices.size()
+                     << "uvs:" << m_mesh->uvs.size();
         }
 
-        if (!m_loader.normals.empty() && m_loader.normals.size() == m_loader.vertices.size()) {
+        if (!m_mesh->normals.empty() && m_mesh->normals.size() == m_mesh->vertices.size()) {
             glGenBuffers(1, &m_normalbo);
             glBindBuffer(GL_ARRAY_BUFFER, m_normalbo);
             glBufferData(
                 GL_ARRAY_BUFFER,
-                static_cast<GLsizeiptr>(m_loader.normals.size() * sizeof(glm::vec3)),
-                m_loader.normals.data(),
+                static_cast<GLsizeiptr>(m_mesh->normals.size() * sizeof(glm::vec3)),
+                m_mesh->normals.data(),
                 GL_STATIC_DRAW
                 );
 
@@ -581,16 +648,16 @@ private:
                 reinterpret_cast<void*>(0)
                 );
 
-            qDebug() << "Normal buffer initialized. Normal count:" << m_loader.normals.size();
+            qDebug() << "Normal buffer initialized. Normal count:" << m_mesh->normals.size();
         } else {
             qDebug() << "Lighting fallback: missing normals or normal/vertex count mismatch."
-                     << "vertices:" << m_loader.vertices.size()
-                     << "normals:" << m_loader.normals.size();
+                     << "vertices:" << m_mesh->vertices.size()
+                     << "normals:" << m_mesh->normals.size();
         }
 
         glBindVertexArray(0);
 
-        m_initialized = true;
+        m_initialized = m_vao && m_vbo && glGetError() == GL_NO_ERROR;
 
         qDebug() << "Model buffers initialized.";
     }
@@ -658,6 +725,8 @@ private:
                 uniform vec3 lightDirection;
                 uniform vec3 cameraPosition;
 
+                uniform vec3 materialColor;
+                uniform vec3 lightColor;
                 uniform float ambientStrength;
                 uniform float diffuseStrength;
                 uniform float specularStrength;
@@ -667,7 +736,7 @@ private:
                 {
                     vec3 baseColor = useTexture
                         ? texture(myTextureSampler, UV).rgb
-                        : vec3(0.22, 0.24, 0.28);
+                        : materialColor;
 
                     vec3 normal = normalize(WorldNormal);
                     vec3 lightDir = normalize(lightDirection);
@@ -688,7 +757,7 @@ private:
 
                     vec3 specular = vec3(1.0) * specularFactor * specularStrength;
 
-                    vec3 finalColor = ambient + diffuse + specular;
+                    vec3 finalColor = (ambient + diffuse + specular) * lightColor;
 
                     fragColor = vec4(finalColor, 1.0);
                 }
@@ -725,7 +794,12 @@ private:
     float m_scale = 1.0f;
     float m_gridY = -1.05f;
 
-    Loader m_loader;
+    MeshPtr m_mesh;
+    ScenePtr m_scene;
+    QPointer<OpenGLViewport> m_viewport;
+    bool m_errorReported = false;
+    struct AssetBuffers { GLuint vao = 0, vbo = 0; GLsizei count = 0; };
+    std::map<QString,AssetBuffers> m_assetBuffers;
     Texture m_texture;
 
     QOpenGLShaderProgram m_program;

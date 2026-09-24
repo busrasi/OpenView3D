@@ -20,6 +20,10 @@ Rectangle {
     Connections {
         target: panel.appController
 
+        function onSceneChanged() {
+            panel.panChanged(0, 0)
+        }
+
         function onViewCountChanged() {
             Qt.callLater(function() {
                 panel.forceViewportFocus()
@@ -91,6 +95,10 @@ Rectangle {
 
             OpenGLViewport {
                 id: viewport
+                objectName: "sceneViewport"
+                meshData: panel.appController ? panel.appController.meshData : undefined
+                sceneData: panel.appController ? panel.appController.sceneData : undefined
+                onRenderingFailed: function(error) { panel.appController.reportRenderError(error) }
                 anchors.fill: parent
 
                 modelPath: panel.appController ? panel.appController.modelPath : ""

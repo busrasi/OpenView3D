@@ -3,6 +3,7 @@
 #include <QVariantList>
 #include "AIProvider.h"
 class AppController;
+class SceneGenerationController;
 
 class ChatController : public QObject {
     Q_OBJECT
@@ -11,7 +12,12 @@ class ChatController : public QObject {
     Q_PROPERTY(QString providerName READ providerName CONSTANT)
     Q_PROPERTY(bool busy READ busy NOTIFY stateChanged)
     Q_PROPERTY(QString error READ error NOTIFY stateChanged)
+    Q_PROPERTY(QString sceneStatus READ sceneStatus NOTIFY stateChanged)
+    Q_PROPERTY(QString lastIntent READ lastIntent NOTIFY stateChanged)
 public:
+    QString sceneStatus() const;
+    QString lastIntent() const { return m_lastIntent; }
+    Q_INVOKABLE void clearGeneratedScene();
     explicit ChatController(AppController* app, QObject* parent = nullptr);
     QVariantList messages() const { return m_messages; }
     QString selectedModelName() const;
@@ -29,6 +35,8 @@ private:
     void execute(const QJsonObject& command);
     AppController* m_app;
     AIProvider* m_provider;
+    SceneGenerationController* m_sceneController;
+    QString m_lastIntent;
     QVariantList m_messages;
     bool m_busy = false;
     QString m_error;

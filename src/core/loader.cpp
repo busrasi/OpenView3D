@@ -1,4 +1,7 @@
 #include "loader.h"
+#include <QFile>
+#include <QFileInfo>
+#include <cmath>
 
 #include <cstdio>
 #include <cstdlib>
@@ -98,16 +101,15 @@ bool Loader::loadOBJ(const char* path)
     std::vector<glm::vec2> temp_uvs;
     std::vector<glm::vec3> temp_normals;
 
-    FILE* file = std::fopen(path, "r");
-    if (file == nullptr) {
-        printf("Impossible to open OBJ file: %s\n", path);
-        return false;
-    }
+    QFile input(QString::fromUtf8(path));
+    if (QFileInfo(input).size() > 256LL*1024*1024 || !input.open(QIODevice::ReadOnly)) return false;
+    // QFile supports Unicode Windows paths and Qt resources.
 
     char line[2048];
 
-    while (std::fgets(line, sizeof(line), file) != nullptr) {
+    while (!input.atEnd() && input.readLine(line, sizeof(line)) > 0) {
         std::string currentLine(line);
+        if (currentLine.size() == sizeof(line)-1 && currentLine.back() != '\n' && !input.atEnd()) return false;
 
         if (currentLine.empty() || currentLine[0] == '#') {
             continue;
@@ -120,10 +122,12 @@ bool Loader::loadOBJ(const char* path)
         if (header == "v") {
             glm::vec3 vertex(0.0f);
             stream >> vertex.x >> vertex.y >> vertex.z;
+            if (!stream || !std::isfinite(vertex.x) || !std::isfinite(vertex.y) || !std::isfinite(vertex.z)) return false;
             temp_vertices.push_back(vertex);
         } else if (header == "vt") {
             glm::vec2 uv(0.0f);
             stream >> uv.x >> uv.y;
+            if (!stream || !std::isfinite(uv.x) || !std::isfinite(uv.y)) return false;
 
             // OBJ UV origin is usually bottom-left, while image data is often treated top-left.
             // Flip V once here so the renderer receives ready-to-use texture coordinates.
@@ -133,6 +137,7 @@ bool Loader::loadOBJ(const char* path)
         } else if (header == "vn") {
             glm::vec3 normal(0.0f);
             stream >> normal.x >> normal.y >> normal.z;
+            if (!stream || !std::isfinite(normal.x) || !std::isfinite(normal.y) || !std::isfinite(normal.z)) return false;
             temp_normals.push_back(normal);
         } else if (header == "f") {
             std::vector<ObjFaceIndex> faceIndices;
@@ -163,10 +168,11 @@ bool Loader::loadOBJ(const char* path)
                     const int vertexArrayIndex = resolveObjIndex(index.vertexIndex, static_cast<int>(temp_vertices.size()));
                     if (vertexArrayIndex < 0 || vertexArrayIndex >= static_cast<int>(temp_vertices.size())) {
                         printf("Invalid vertex index in OBJ face.\n");
-                        std::fclose(file);
+                        input.close();
                         return false;
                     }
 
+                    if (vertices.size() >= 12000000) return false;
                     vertices.push_back(temp_vertices[vertexArrayIndex]);
 
                     if (index.uvIndex != 0) {
@@ -191,11 +197,18 @@ bool Loader::loadOBJ(const char* path)
                         normals.push_back(glm::vec3(0.0f, 0.0f, 1.0f));
                     }
                 }
+                // Imported scans frequently omit normals. Give them real surface lighting.
+                const size_t start = vertices.size()-3;
+                auto normal = glm::cross(vertices[start+1]-vertices[start],vertices[start+2]-vertices[start]);
+                const float length = glm::length(normal);
+                normal = length > 1e-12f ? normal/length : glm::vec3(0,1,0);
+                for (int corner=0;corner<3;++corner)
+                    if (triangle[corner].normalIndex == 0) normals[start+corner] = normal;
             }
         }
     }
 
-    std::fclose(file);
+    input.close();
 
     printf("OBJ loaded. Vertices: %zu, UVs: %zu, Normals: %zu\n",
            vertices.size(),
@@ -207,5 +220,7 @@ bool Loader::loadOBJ(const char* path)
         return false;
     }
 
+    minimum = maximum = vertices.front();
+    for (const auto& v : vertices) { minimum = glm::min(minimum,v); maximum = glm::max(maximum,v); }
     return true;
 }

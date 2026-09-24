@@ -3,6 +3,9 @@
 
 #include <QQuickFramebufferObject>
 #include <QString>
+#include <QVariant>
+#include "core/MeshData.h"
+#include "scene/SceneData.h"
 
 class OpenGLViewport : public QQuickFramebufferObject
 {
@@ -18,7 +21,13 @@ class OpenGLViewport : public QQuickFramebufferObject
     Q_PROPERTY(float panX READ panX WRITE setPanX NOTIFY panXChanged)
     Q_PROPERTY(float panY READ panY WRITE setPanY NOTIFY panYChanged)
 
+    Q_PROPERTY(QVariant meshData READ meshData WRITE setMeshData NOTIFY meshDataChanged)
+    Q_PROPERTY(QVariant sceneData READ sceneData WRITE setSceneData NOTIFY sceneDataChanged)
 public:
+    QVariant meshData() const { return QVariant::fromValue(m_mesh); }
+    QVariant sceneData() const { return QVariant::fromValue(m_scene); }
+    void setMeshData(const QVariant& value) { m_mesh = value.value<MeshPtr>(); emit meshDataChanged(); update(); }
+    void setSceneData(const QVariant& value) { m_scene = value.value<ScenePtr>(); emit sceneDataChanged(); update(); }
     explicit OpenGLViewport(QQuickItem* parent = nullptr);
 
     QString modelPath() const;
@@ -45,6 +54,9 @@ public:
     QQuickFramebufferObject::Renderer* createRenderer() const override;
 
 signals:
+    void meshDataChanged();
+    void sceneDataChanged();
+    void renderingFailed(const QString& error);
     void modelPathChanged();
     void texturePathChanged();
 
@@ -56,6 +68,8 @@ signals:
     void panYChanged();
 
 private:
+    MeshPtr m_mesh;
+    ScenePtr m_scene;
     QString m_modelPath;
     QString m_texturePath;
 

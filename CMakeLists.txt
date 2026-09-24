@@ -68,10 +68,19 @@ add_library(openview_mesh STATIC src/mesh/MeshEditingService.cpp src/mesh/MeshEd
 target_include_directories(openview_mesh PUBLIC "${CMAKE_SOURCE_DIR}/src")
 target_link_libraries(openview_mesh PUBLIC Qt6::Core manifold)
 
-add_library(openview_ai STATIC src/ai/AIProvider.cpp src/ai/AIProvider.h
+add_library(openview_geometry STATIC src/core/loader.cpp src/core/loader.h src/core/MeshData.h)
+target_include_directories(openview_geometry PUBLIC "${CMAKE_SOURCE_DIR}/src" "${CMAKE_SOURCE_DIR}/thirdparty/glm-0.9.7.1")
+target_link_libraries(openview_geometry PUBLIC Qt6::Core libglew_static)
+add_library(openview_scene STATIC src/scene/SceneSpec.cpp src/scene/SceneSpec.h
+    src/scene/SceneData.h src/scene/ScenePresets.cpp src/scene/ScenePresets.h
+    src/scene/SceneAssetManager.cpp src/scene/SceneAssetManager.h src/scene/SceneBuilder.cpp src/scene/SceneBuilder.h)
+target_include_directories(openview_scene PUBLIC "${CMAKE_SOURCE_DIR}/src")
+target_link_libraries(openview_scene PUBLIC Qt6::Gui)
+add_library(openview_ai STATIC src/ai/RequestRouter.cpp src/ai/RequestRouter.h
+    src/scene/SceneGenerationController.cpp src/scene/SceneGenerationController.h src/scene/SceneJobManager.h src/ai/AIProvider.cpp src/ai/AIProvider.h
     src/ai/ChatController.cpp src/ai/ChatController.h src/ui/AppController.cpp src/ui/AppController.h)
 target_include_directories(openview_ai PUBLIC "${CMAKE_SOURCE_DIR}/src")
-target_link_libraries(openview_ai PUBLIC openview_mesh Qt6::Network Qt6::Concurrent)
+target_link_libraries(openview_ai PUBLIC openview_mesh openview_scene openview_geometry Qt6::Network Qt6::Concurrent)
 
 # -------------------------------------------------------------------------------------------------
 # Source Files
@@ -91,7 +100,6 @@ set(OPENVIEW3D_SOURCES
     "${CMAKE_SOURCE_DIR}/src/main.cpp"
     "${CMAKE_SOURCE_DIR}/src/core/openGLWindow.cpp"
     "${CMAKE_SOURCE_DIR}/src/core/controls.cpp"
-    "${CMAKE_SOURCE_DIR}/src/core/loader.cpp"
     "${CMAKE_SOURCE_DIR}/src/core/shader.cpp"
     "${CMAKE_SOURCE_DIR}/src/core/texture.cpp"
     "${CMAKE_SOURCE_DIR}/src/core/renderer.cpp"
@@ -131,8 +139,11 @@ qt_add_qml_module(OpenView3D
         qml/icons/view_top.svg
         qml/icons/view_iso.svg
         resources/model_vase/model.obj
+        resources/model_vase/model.mtl
         resources/model_vase/texture_0.png
         resources/models/capsule.obj
+        resources/models/capsule.mtl
+        resources/models/capsule0.png
         QML_FILES qml/components/ToolButtonCard.qml
         QML_FILES qml/components/LabeledSlider.qml
         QML_FILES qml/components/ViewPresetCard.qml
@@ -216,8 +227,11 @@ endif()
 include(CTest)
 if(BUILD_TESTING)
     target_compile_definitions(OpenView3D PRIVATE OPENVIEW3D_TESTING)
-    add_executable(MeshEditingTests tests/MeshEditingTests.cpp src/core/loader.cpp)
+    add_executable(MeshEditingTests tests/MeshEditingTests.cpp)
     target_include_directories(MeshEditingTests PRIVATE "${CMAKE_SOURCE_DIR}/thirdparty/glm-0.9.7.1")
     target_link_libraries(MeshEditingTests PRIVATE openview_ai libglew_static)
     add_test(NAME MeshEditingTests COMMAND MeshEditingTests)
+    add_executable(SceneGenerationTests tests/SceneGenerationTests.cpp)
+    target_link_libraries(SceneGenerationTests PRIVATE openview_ai)
+    add_test(NAME SceneGenerationTests COMMAND SceneGenerationTests)
 endif()

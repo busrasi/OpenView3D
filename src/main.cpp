@@ -11,6 +11,7 @@
 #include <QIcon>
 #ifdef OPENVIEW3D_TESTING
 #include "tests/UiSmoke.h"
+#include "tests/SceneUiSmoke.h"
 #endif
 
 int main(int argc, char* argv[])
@@ -27,7 +28,8 @@ int main(int argc, char* argv[])
     QGuiApplication app(argc, argv);
 #ifdef OPENVIEW3D_TESTING
     const bool aiSmoke = app.arguments().contains("--ai-smoke-test");
-    if (aiSmoke) qunsetenv("OPENAI_API_KEY");
+    const bool sceneSmoke = app.arguments().contains("--scene-smoke-test");
+    if (aiSmoke || sceneSmoke) qunsetenv("OPENAI_API_KEY");
 #endif
     app.setWindowIcon(
         QIcon(":/qt/qml/OpenView3D/qml/icons/icon256.png")
@@ -58,6 +60,7 @@ int main(int argc, char* argv[])
 
 #ifdef OPENVIEW3D_TESTING
     if (aiSmoke) startAiSmokeTest(app, engine, appController, chatController);
+    if (sceneSmoke) startSceneSmokeTest(app, engine, appController, chatController);
 #endif
 
     return app.exec();

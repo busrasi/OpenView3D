@@ -4,6 +4,9 @@
 #include <QObject>
 #include <QString>
 #include <QVector>
+#include <QVariant>
+#include "core/MeshData.h"
+#include "scene/SceneData.h"
 #include <QNetworkAccessManager>
 
 class AppController : public QObject
@@ -21,6 +24,17 @@ class AppController : public QObject
     Q_PROPERTY(float rotationY READ rotationY WRITE setRotationY NOTIFY rotationYChanged)
 
 public:
+    Q_PROPERTY(QVariant meshData READ meshData NOTIFY meshChanged)
+    Q_PROPERTY(QVariant sceneData READ sceneData NOTIFY sceneChanged)
+    Q_PROPERTY(QString modelError READ modelError NOTIFY meshChanged)
+    QVariant meshData() const { return QVariant::fromValue(activeView().mesh); }
+    QVariant sceneData() const { return QVariant::fromValue(activeView().scene); }
+    QString modelError() const { return activeView().loadError; }
+    quint64 selectionRevision() const { return m_selectionRevision; }
+    SelectedModelSnapshot selectedSnapshot() const;
+    void applyScene(ScenePtr scene);
+    Q_INVOKABLE void clearGeneratedScene();
+    Q_INVOKABLE void reportRenderError(const QString& error) { emit renderingFailed(error); }
     explicit AppController(QObject* parent = nullptr);
 
     int activeViewIndex() const;
@@ -49,6 +63,9 @@ public:
     Q_INVOKABLE void generateModel(const QString& imagePath);
 
 signals:
+    void renderingFailed(const QString& error);
+    void meshChanged();
+    void sceneChanged();
     void activeViewIndexChanged();
     void viewCountChanged();
 
@@ -65,6 +82,10 @@ signals:
 public:
     // The existing active view is the selected model record; no separate selection store.
     struct ViewState {
+        MeshPtr mesh;
+        ScenePtr scene;
+        QString loadError;
+        quint64 loadToken = 0;
         QString modelPath;
         QString texturePath;
         float zoom = 1.0f;
@@ -80,6 +101,8 @@ private:
     const ViewState& activeView() const;
 
 private:
+    quint64 m_selectionRevision = 0;
+    quint64 m_loadToken = 0;
     QVector<ViewState> m_views;
     int m_activeViewIndex = 0;
     static constexpr int MaxViews = 15;
